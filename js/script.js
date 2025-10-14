@@ -20,17 +20,21 @@ document.addEventListener("DOMContentLoaded", function() {
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwTrVIDuiM30oIrO_KNrsd82u4weR_ssQMKTCeN2LJnqPAE1q60-VDkGPmaxAjivGHgbg/exec';
 
     async function fetchBranchData() {
+        console.log("Fetching GAS data from:", GAS_URL);
         try {
             const response = await fetch(GAS_URL);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
+            console.log("GAS data fetched:", data);
             // The API seems to return branch names in '지점명' and addresses in '주소'.
             // Let's filter by address which is more reliable.
             const gangwonBranches = data.filter(branch => branch['주소'] && branch['주소'].includes('강원'));
+            console.log("Filtered branches count:", gangwonBranches.length);
 
             populateListView(gangwonBranches);
+            console.log("Initializing Kakao Map with branch data...");
             kakao.maps.load(() => {
                 initializeMap(gangwonBranches);
             });

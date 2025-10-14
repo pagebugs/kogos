@@ -117,5 +117,20 @@ document.addEventListener("DOMContentLoaded", function() {
         mapBtn.classList.remove('active');
     });
 
+    // GAS 연동 테스트 (데이터 요청 확인용)
+    console.log("GAS 연동 테스트: 데이터 요청 중...");
+    // 실제 GAS 연동 코드는 추후 구현 예정
+
+    // Kakao map 연동 테스트
+    kakao.maps.load(function() {
+        var container = document.getElementById('map');
+        var options = {
+            center: new kakao.maps.LatLng(33.450701, 126.570667),
+            level: 3
+        };
+        var map = new kakao.maps.Map(container, options);
+        console.log("Kakao Map 로드 완료");
+    });
+
     fetchBranchData();
 });

@@ -28,10 +28,9 @@ body {
 #main-header {
     position: fixed;
     top: 0;
-    left: 0;
     width: 100%;
     height: var(--header-height);
-    background-color: white;
+    background: rgba(255, 255, 255, 0.9);
     z-index: 1000;
     transition: top 0.3s ease-in-out;
     border-bottom: 1px solid #eee;
@@ -53,7 +52,9 @@ section {
 }
 
 #landing {
+    width: 100vw;
     height: 100vh;
+    margin-top: 50px; /* 헤더 높이만큼 여백 조정 */
 }
 
 #feature-content {

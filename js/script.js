@@ -30,8 +30,10 @@ document.addEventListener("DOMContentLoaded", function() {
             // Let's filter by address which is more reliable.
             const gangwonBranches = data.filter(branch => branch['주소'] && branch['주소'].includes('강원'));
 
-            initializeMap(gangwonBranches);
             populateListView(gangwonBranches);
+            kakao.maps.load(() => {
+                initializeMap(gangwonBranches);
+            });
 
         } catch (error) {
             console.error("Failed to fetch branch data:", error);

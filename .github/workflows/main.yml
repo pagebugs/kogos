@@ -1,9 +1,5 @@
 name: Run Scraper   # 워크플로 이름
 
-env:
-  GAS_ENDPOINT: ${{ secrets.GAS_ENDPOINT }}
-  CACHE_BUSTER: ${{ github.run_id }}
-
 on:
   workflow_dispatch:  # 수동 실행 (Actions 탭에서 “Run workflow” 가능)
 
@@ -25,7 +21,7 @@ jobs:
 
       - name: Run scraper
         env:
-          GAS_ENDPOINT: ${{ secrets.GAS_ENDPOINT }}
+          GAS_ENDPOINT: "https://script.google.com/macros/s/AKfycby0yJeYe8QA5al2uX2Obdk5THmCPqegiAjVYcG8lsqb7aBQ3nEKkGebsYegKQio-8tXLg/exec"
         run: node api/scrape.js
 
       - name: Save output

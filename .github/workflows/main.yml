@@ -1,14 +1,29 @@
 # .github/workflows/scrape.yml
 name: Run Scraper
+
 on:
-  workflow_dispatch:  # 수동 실행
+  workflow_dispatch:
+
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: node api/scrape.js
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run scraper
+        run: node api/scrape.js
+
+      # ✅ 최신 버전 (v4)으로 교체
+      - name: Save output
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-result-${{ github.run_number }}-${{ github.run_attempt }}
+          path: result.json
+          retention-days: 7

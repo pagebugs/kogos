@@ -1,0 +1,17 @@
+{
+  "name": "kogos-scraper",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Serverless puppeteer scraper for NongHyup branch data",
+  "main": "api/scrape.js",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@sparticuz/chromium-min": "^117.0.0",
+    "puppeteer-core": "^21.6.1"
+  },
+  "devDependencies": {
+    "vercel": "^32.5.1"
+  }
+}

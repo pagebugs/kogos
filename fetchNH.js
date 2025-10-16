@@ -1,4 +1,3 @@
-import fetch from "node-fetch";
 import fs from "fs";
 import dotenv from "dotenv";
 import { groupBranches } from "./utils/groupBranches.js";

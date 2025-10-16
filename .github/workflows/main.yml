@@ -1,29 +1,11 @@
-# .github/workflows/scrape.yml
-name: Run Scraper
-
-on:
-  workflow_dispatch:
-
-jobs:
-  run-scraper:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run scraper
-        run: node api/scrape.js
-
-      # ✅ 최신 버전 (v4)으로 교체
-      - name: Save output
-        uses: actions/upload-artifact@v4
-        with:
-          name: scrape-result-${{ github.run_number }}-${{ github.run_attempt }}
-          path: result.json
-          retention-days: 7
+- name: Run scraper
+  env:
+    GAS_ENDPOINT: ${{ secrets.GAS_ENDPOINT }}
+  run: node api/scrape.js
+- name: Cache node modules
+  uses: actions/cache@v4
+  with:
+    path: ~/.npm
+    key: ${{ runner.os }}-npm-cache-${{ hashFiles('package-lock.json') }}
+    restore-keys: |
+      ${{ runner.os }}-npm-cache-

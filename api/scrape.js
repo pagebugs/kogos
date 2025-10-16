@@ -1,8 +1,6 @@
 /**
  * 농협 사무소/지점 크롤러 (로컬 크롬 버전)
  */
-console.log("✅ GAS_ENDPOINT =", GAS_ENDPOINT);
-
 import puppeteer from "puppeteer-core";
 import fetch from "node-fetch";
 import fs from "fs";

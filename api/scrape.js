@@ -1,250 +1,139 @@
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { readFile } from 'fs/promises';
+/**
+ * 농협 사무소/지점 크롤러 (GAS 연동)
+ * 입력: GAS doGet() → Sheet1
+ * 출력: GAS doPost() → BranchList
+ */
+
 import fs from "fs";
-import chromium from '@sparticuz/chromium-min';
-import puppeteer from 'puppeteer-core';
+import path from "path";
+import chromium from "@sparticuz/chromium-min";
+import puppeteer from "puppeteer-core";
+import fetch from "node-fetch";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_PATH = join(__dirname, '..', 'data', 'baseSites.json');
+// ✅ 환경 변수로 Apps Script 엔드포인트 관리
+const GAS_ENDPOINT =
+  "https://script.google.com/macros/s/AKfycbwTrVIDuiM30oIrO_KNrsd82u4weR_ssQMKTCeN2LJnqPAE1q60-VDkGPmaxAjivGHgbg/exec";
 
-const BRANCH_NAME_PATTERN = /(지점|사무소|출장소|분소|본점|센터)/;
-const CONTACT_PATTERN = /(?:Tel|전화|T|☎)\s*[:：]?\s*([0-9\-()]+)/i;
-const FAX_PATTERN = /(?:Fax|팩스|F)\s*[:：]?\s*([0-9\-()]+)/i;
+// ✅ 시트 데이터 불러오기
+async function loadSitesFromSheet() {
+  console.log("📡 Google Sheet 데이터 로드 중...");
+  const res = await fetch(GAS_ENDPOINT);
+  if (!res.ok) throw new Error(`시트 요청 실패 (${res.status})`);
+  const data = await res.json();
 
-async function loadSites() {
-  try {
-    const json = await readFile(DATA_PATH, 'utf-8');
-    const sites = JSON.parse(json);
-    if (!Array.isArray(sites)) {
-      throw new Error('baseSites.json must contain an array');
-    }
-    return sites;
-  } catch (error) {
-    console.error('Failed to load baseSites.json', error);
-    throw error;
-  }
+  const sites = data
+    .filter(row => row["홈페이지"] && row["홈페이지"].includes("http"))
+    .map(row => ({
+      name: row["농·축협"] || row["지역"] || "Unknown",
+      url: row["홈페이지"],
+    }));
+
+  console.log(`✅ ${sites.length}개 농협 로드 완료`);
+  return sites;
 }
 
-function parseBranchBlocks(blocks) {
-  return blocks
-    .map((block) => block.split('\n').map((line) => line.trim()).filter(Boolean))
-    .filter((lines) => lines.length > 0)
-    .map((lines) => {
-      const flat = lines.join(' ');
-      const nameLine =
-        lines.find((line) => BRANCH_NAME_PATTERN.test(line)) || lines[0];
-      const telMatch = flat.match(CONTACT_PATTERN);
-      const faxMatch = flat.match(FAX_PATTERN);
-      const addressLine = lines.find(
-        (line) =>
-          /(주소|로\s|길\s|구\s|동\s|읍\s|면\s|리\s|번지|호)/.test(line) &&
-          !/(Tel|전화|팩스|Fax|☎|F\s?\.)/i.test(line)
-      );
-
-      return {
-        name: nameLine || null,
-        address: addressLine || null,
-        tel: telMatch ? telMatch[1].trim() : null,
-        fax: faxMatch ? faxMatch[1].trim() : null,
-        raw: lines,
-      };
-    });
-}
-
-async function scrapeBranches(page) {
-  const selectors = ['table tr', 'ul li', 'ol li', 'div'];
-  const branchBlocks = await page.evaluate(
-    (branchSelectors, namePattern) => {
-      const pattern = new RegExp(namePattern);
-      const seen = new Set();
-      const blocks = [];
-
-      const collectText = (element) =>
-        element.innerText
-          .split('\n')
-          .map((text) => text.trim())
-          .filter(Boolean)
-          .join('\n');
-
-      branchSelectors.forEach((selector) => {
-        document.querySelectorAll(selector).forEach((element) => {
-          const textBlock = collectText(element);
-          if (!textBlock) return;
-
-          if (pattern.test(textBlock) && !seen.has(textBlock)) {
-            seen.add(textBlock);
-            blocks.push(textBlock);
-          }
-        });
-      });
-
-      return blocks;
-    },
-    selectors,
-    BRANCH_NAME_PATTERN.source
-  );
-
-  return parseBranchBlocks(branchBlocks);
-}
-
-async function findBranchLink(page) {
-  const anchorCandidates = await page.evaluate(() => {
-    const targetTextPattern = /(사무소|지점|출장소|분소|본점|센터)/;
-
-    return Array.from(document.querySelectorAll('a'))
-      .map((anchor) => ({
-        href: anchor.href,
-        text: anchor.innerText.trim(),
-      }))
-      .filter(({ text, href }) => text && href && targetTextPattern.test(text));
-  });
-
-  if (!anchorCandidates.length) {
-    return null;
-  }
-
-  const preferred = anchorCandidates.find(({ href }) =>
-    /indexSub\.do/.test(href)
-  );
-
-  return (preferred || anchorCandidates[0]).href;
-}
-
-async function createBrowser() {
-  const executablePath = await chromium.executablePath();
-
+// ✅ Puppeteer 브라우저 실행
+async function launchBrowser() {
   return puppeteer.launch({
-    args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+    args: chromium.args,
     defaultViewport: chromium.defaultViewport,
-    executablePath,
+    executablePath: await chromium.executablePath(),
     headless: chromium.headless,
   });
 }
 
-export default async function handler(req, res) {
-  if (req.method && req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  let browser;
-  const summary = [];
+// ✅ 각 사이트별 사무소/지점 데이터 수집
+async function scrapeBranches(site) {
+  const browser = await launchBrowser();
+  const page = await browser.newPage();
+  const results = [];
 
   try {
-    const sites = await loadSites();
-    browser = await createBrowser();
-    const page = await browser.newPage();
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    );
+    console.log(`🕵️‍♂️ [${site.name}] 접속 중...`);
+    await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-    for (const site of sites) {
-      const { region, coop, url } = site;
-      const record = {
-        region,
-        coop,
-        base: url,
-        branchURL: null,
-        branches: [],
-        errors: [],
-      };
-      console.log(`▶ Start: ${coop} (${url})`);
-
-      try {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-      } catch (error) {
-        const message = `Base page load failed: ${error.message}`;
-        console.error(`🚫 ${coop} - ${message}`);
-        record.errors.push(message);
-        summary.push(record);
-        continue;
-      }
-
-      let branchURL = null;
-
-      try {
-        branchURL = await findBranchLink(page);
-        if (!branchURL) {
-          throw new Error('No branch-related link found');
-        }
-        record.branchURL = branchURL;
-      } catch (error) {
-        const message = `Branch link detection failed: ${error.message}`;
-        console.error(`🚫 ${coop} - ${message}`);
-        record.errors.push(message);
-        summary.push(record);
-        continue;
-      }
-
-      try {
-        await page.goto(branchURL, { waitUntil: 'networkidle2', timeout: 60000 });
-        const branches = await scrapeBranches(page);
-        record.branches = branches;
-        console.log(`✅ ${coop}: collected ${branches.length} branches`);
-      } catch (error) {
-        const message = `Branch page processing failed: ${error.message}`;
-        console.error(`🚫 ${coop} - ${message}`);
-        record.errors.push(message);
-      }
-
-      summary.push(record);
-    }
-
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.status(200).json({
-      status: 'ok',
-      total: summary.length,
-      timestamp: new Date().toISOString(),
-      data: summary,
+    const targetLink = await page.evaluate(() => {
+      const anchors = Array.from(document.querySelectorAll("a"));
+      const target = anchors.find(a =>
+        a.textContent.includes("사무소") || a.textContent.includes("지점")
+      );
+      return target ? target.href : null;
     });
-  } catch (error) {
-    console.error('Fatal error in scrape handler', error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    if (browser) {
+
+    if (!targetLink) {
+      console.warn(`⚠️ [${site.name}] 사무소/지점 링크를 찾을 수 없음`);
       await browser.close();
+      return [];
     }
-  }
 
-(async () => {
-  console.log("🚀 Scraper started at", new Date().toISOString());
+    await page.goto(targetLink, { waitUntil: "domcontentloaded", timeout: 30000 });
+    console.log(`📍 [${site.name}] 페이지 이동 완료`);
 
-  try {
-    const sites = await loadSites();
-
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+    const branches = await page.evaluate(() => {
+      const rows = [];
+      const trs = document.querySelectorAll("table tr");
+      trs.forEach(tr => {
+        const tds = tr.querySelectorAll("td");
+        if (tds.length >= 2) {
+          const name = tds[0]?.innerText?.trim();
+          const address = tds[1]?.innerText?.trim();
+          const phone = tds[2]?.innerText?.trim() || "";
+          if (name && address) rows.push({ name, address, phone });
+        }
+      });
+      return rows;
     });
 
-    const page = await browser.newPage();
-    const results = [];
-
-    for (const site of sites) {
-      console.log(`🕵️ Processing: ${site.coop} (${site.url})`);
-      try {
-        await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 60000 });
-        const branches = await scrapeBranches(page);
-        results.push({ ...site, branches });
-        console.log(`✅ ${site.coop}: ${branches.length} branches found`);
-      } catch (err) {
-        console.error(`❌ ${site.coop} failed:`, err.message);
-      }
-    }
-
+    results.push(...branches);
+    console.log(`✅ [${site.name}] ${results.length}건 수집`);
+  } catch (e) {
+    console.error(`❌ [${site.name}] 오류: ${e.message}`);
+  } finally {
     await browser.close();
-
-    // 결과 저장 (GitHub Actions 아티팩트 확인용)
-    fs.writeFileSync("result.json", JSON.stringify(results, null, 2));
-    console.log("📝 Results saved to result.json");
-
-  } catch (err) {
-    console.error("🔥 Fatal error:", err);
-    process.exit(1);
   }
-})();
 
+  return results.map(r => ({ site: site.name, ...r }));
 }
+
+// ✅ GAS로 결과 전송
+async function postResultsToSheet(results) {
+  console.log(`📤 BranchList 시트에 ${results.length}건 업로드 중...`);
+  const res = await fetch(GAS_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(results),
+  });
+
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    if (json.ok) {
+      console.log(`✅ 업로드 완료 (${json.count}건)`);
+    } else {
+      console.warn("⚠️ 업로드 실패:", json.error || text);
+    }
+  } catch {
+    console.warn("⚠️ GAS 응답 파싱 실패:", text);
+  }
+}
+
+// ✅ 전체 실행
+(async () => {
+  console.log("🚀 농협 BranchList 자동화 시작");
+
+  const sites = await loadSitesFromSheet();
+  const allResults = [];
+
+  for (const site of sites) {
+    const branches = await scrapeBranches(site);
+    allResults.push(...branches);
+  }
+
+  // 로컬 백업
+  const outPath = path.resolve(process.cwd(), "result.json");
+  fs.writeFileSync(outPath, JSON.stringify(allResults, null, 2), "utf-8");
+  console.log(`💾 로컬 백업 저장 완료: ${outPath}`);
+
+  await postResultsToSheet(allResults);
+  console.log("🏁 모든 데이터 처리 완료");
+})();

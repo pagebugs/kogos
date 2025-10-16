@@ -1,5 +1,9 @@
 name: Run Scraper   # 워크플로 이름
 
+env:
+  GAS_ENDPOINT: ${{ secrets.GAS_ENDPOINT }}
+  CACHE_BUSTER: ${{ github.run_id }}
+
 on:
   workflow_dispatch:  # 수동 실행 (Actions 탭에서 “Run workflow” 가능)
 

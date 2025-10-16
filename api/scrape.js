@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readFile } from 'fs/promises';
+import fs from "fs";
 import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
 
@@ -205,4 +206,45 @@ export default async function handler(req, res) {
       await browser.close();
     }
   }
+
+(async () => {
+  console.log("🚀 Scraper started at", new Date().toISOString());
+
+  try {
+    const sites = await loadSites();
+
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+
+    const page = await browser.newPage();
+    const results = [];
+
+    for (const site of sites) {
+      console.log(`🕵️ Processing: ${site.coop} (${site.url})`);
+      try {
+        await page.goto(site.url, { waitUntil: "domcontentloaded", timeout: 60000 });
+        const branches = await scrapeBranches(page);
+        results.push({ ...site, branches });
+        console.log(`✅ ${site.coop}: ${branches.length} branches found`);
+      } catch (err) {
+        console.error(`❌ ${site.coop} failed:`, err.message);
+      }
+    }
+
+    await browser.close();
+
+    // 결과 저장 (GitHub Actions 아티팩트 확인용)
+    fs.writeFileSync("result.json", JSON.stringify(results, null, 2));
+    console.log("📝 Results saved to result.json");
+
+  } catch (err) {
+    console.error("🔥 Fatal error:", err);
+    process.exit(1);
+  }
+})();
+
 }

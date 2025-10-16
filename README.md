@@ -39,6 +39,7 @@ Serverless Puppeteer scraper that gathers branch/office information from 농협 
    - Push the repository to GitHub.
    - In the Vercel dashboard choose *New Project* and connect the repository.
    - Keep the default build command (`npm install`) and no output directory (API only).
+   - Ensure the project uses the **Node.js 18** runtime (Vercel default) so that the serverless function matches `vercel.json`.
    - Deploy. The serverless endpoint becomes available at `https://<project>.vercel.app/api/scrape`.
 
 ## Configuration

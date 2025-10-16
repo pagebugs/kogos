@@ -1,0 +1,31 @@
+name: Build NH Branch DB
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run data collector
+        run: node fetchNH.js
+        env:
+          KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
+
+      - name: Upload CSV artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: branches-db
+          path: output/branches.csv

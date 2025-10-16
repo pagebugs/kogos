@@ -1,17 +1,13 @@
 {
-  "name": "kogos-scraper",
+  "name": "nh-branch-scraper",
   "version": "1.0.0",
+  "description": "Kakao Map 기반 강원도 농협 브랜치 자동 수집기",
   "type": "module",
-  "description": "Serverless puppeteer scraper for NongHyup branch data",
-  "main": "api/scrape.js",
   "scripts": {
-    "dev": "vercel dev"
+    "start": "node fetchNH.js"
   },
   "dependencies": {
-    "@sparticuz/chromium-min": "^117.0.0",
-    "puppeteer-core": "^21.6.1"
-  },
-  "devDependencies": {
-    "vercel": "^32.5.1"
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
   }
 }

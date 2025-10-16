@@ -11,8 +11,13 @@ import fs from "fs";
 const LOCAL_CHROME_PATH = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 
 // ✅ GAS Web App Endpoint
-const GAS_ENDPOINT =
-  "https://script.google.com/macros/s/AKfycby0yJeYe8QA5al2uX2Obdk5THmCPqegiAjVYcG8lsqb7aBQ3nEKkGebsYegKQio-8tXLg/exec";
+const GAS_ENDPOINT = process.env.GAS_ENDPOINT?.trim() || "https://script.google.com/macros/s/AKfycby0yJeYe8QA5al2uX2Obdk5THmCPqegiAjVYcG8lsqb7aBQ3nEKkGebsYegKQio-8tXLg/exec";
+
+if (process.env.GAS_ENDPOINT)
+  console.log("✅ Using Secret:", process.env.GAS_ENDPOINT);
+else
+  console.log("⚠️  No secret found → Using fallback endpoint:", GAS_ENDPOINT);
+
 
 // ✅ 시트에서 사이트 목록 불러오기
 async function loadSitesFromSheet() {

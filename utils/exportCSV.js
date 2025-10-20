@@ -1,11 +1,22 @@
 import fs from "fs";
+import { stringify } from "csv-stringify/sync";
 
 export function exportCSV(data, path) {
-  const header = "메인브랜치,서브브랜치,주소,전화번호\n";
-  const rows = data.map(
-    (d) => `${d.main},${d.sub},${d.address || ""},${d.phone || ""}`
-  ).join("\n");
+  if (!data || data.length === 0) {
+    console.warn("⚠️ exportCSV: 저장할 데이터가 없습니다.");
+    return;
+  }
 
-  fs.mkdirSync("./output", { recursive: true });
-  fs.writeFileSync(path, header + rows, "utf8");
+  // ✅ data[0]의 키를 동적으로 읽어 헤더 생성
+  const columns = Object.keys(data[0]);
+  const csv = stringify(data, {
+    header: true,
+    columns,
+  });
+
+  // ✅ UTF-8 with BOM (엑셀 호환)
+  const bom = Buffer.from("\uFEFF", "utf8");
+  fs.writeFileSync(path, bom + csv, "utf8");
+
+  console.log(`✅ CSV 저장 완료 (UTF-8 + BOM, ${data.length}건): ${path}`);
 }
